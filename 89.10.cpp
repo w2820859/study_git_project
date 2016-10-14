@@ -17,6 +17,7 @@ RnhNCellFreqInfoFilterD eutranRatFilter;
 RnhNCellFreqInfoFilterRuleForRatTypeD ruleForRatType(ELIB_CONST_EUTRANFREQRELATION_FRO_TYPE);
 eutranRatFilter.addRule(&ruleForRatType);
 freqInfoListHandlerPtr->getFreqInfoList(cellDataPtr->getCellId(), nFreqInfoList, &eutranRatFilter);
+U32 pCellLbmId = cellDataPtr->getServingCellHandlerPtr()->getDuId(cellDataPtr->getCellId());
  
 ELIB_TRACE_DECISION(
     Ft_UE_RAC_MEASUREMENTS,
@@ -53,7 +54,8 @@ for (RnhNCellFreqInfoBaseIfPtrVectorD::const_iterator itFreq = nFreqInfoList.beg
               eutranCellPtr->getSCellCandidate(cellDataPtr->getCellId()));
      
       /* for each neighbor cell */
-      if(eutranCellPtr->getSCellCandidate(cellDataPtr->getCellId()) == 1)
+      if((eutranCellPtr->getSCellCandidate(cellDataPtr->getCellId()) == RNH_COMMON_SCELLCANDIDATE_ALLOWED) ||
+          (eutranCellPtr->getSCellCandidate(cellDataPtr->getCellId()) == RNH_COMMON_SCELLCANDIDATE_ONLY_ALLOWED_FOR_DL))
       {       
         if(cellDataPtr->getFroType() == ELIB_CONST_EUTRANCELLFDD_FRO_TYPE)
         {
@@ -64,23 +66,38 @@ for (RnhNCellFreqInfoBaseIfPtrVectorD::const_iterator itFreq = nFreqInfoList.beg
             if((*cellInfoIter)->getCellFroRef().getFroId() != cellDataPtr->getFroId())
             {
               // PCell FDD, SCell FDD, add SCell FDD
-              saveEnbSCellCandidateInList(eutranCellPtr, sCellCandidateList, isDlOnlyFreq);
+              saveEnbSCellCandidateInList(eutranCellPtr, sCellCandidateList, isDlOnlyFreq, false, UEH_INVALID_U32);
               sCellFreqPriority = UEH_COMMON_SCELL_FREQ_PRIORITY_FDD;
-             
+ 
               ELIB_TRACE_DECISION(
                   Ft_UE_RAC_MEASUREMENTS,
                   "updateEnbSCellCandidateList::PCell FDD, SCell FDD, add SCell FDD, isDlOnlyFreq=%d scell cellId=%d, sCellFreqPriority=%d",
                   isDlOnlyFreq,
                   eutranCellPtr->getCgi().eNodeBCellId.cellId,
                   sCellFreqPriority);
-             
-            }   
+ 
+            }
+          }
+          else if((*cellInfoIter)->getCellFroRef().getFroType() == ELIB_CONST_EXTERNALEUTRANCELLFDD_FRO_TYPE)
+          {
+            // PCell FDD, SCell FDD, add SCell FDD
+            // SCell is external FDD, don't need to check the FroId.
+            saveEnbSCellCandidateInList(eutranCellPtr, sCellCandidateList, isDlOnlyFreq, true, pCellLbmId);
+            sCellFreqPriority = UEH_COMMON_SCELL_FREQ_PRIORITY_FDD;
+ 
+            ELIB_TRACE_DECISION(
+                Ft_UE_RAC_MEASUREMENTS,
+                "updateEnbSCellCandidateList::PCell FDD, external SCell FDD, add external SCell FDD, isDlOnlyFreq=%d scell cellId=%d, sCellFreqPriority=%d",
+                isDlOnlyFreq,
+                eutranCellPtr->getCgi().eNodeBCellId.cellId,
+                sCellFreqPriority);
+ 
           }
           else if((*cellInfoIter)->getCellFroRef().getFroType() == ELIB_CONST_EUTRANCELLTDD_FRO_TYPE)
           {
             // PCell FDD, SCell TDD, add SCell TDD
             // SCell is TDD. don't need to check the FroId.
-            saveEnbSCellCandidateInList(eutranCellPtr, sCellCandidateList, isDlOnlyFreq); 
+            saveEnbSCellCandidateInList(eutranCellPtr, sCellCandidateList, isDlOnlyFreq, false, UEH_INVALID_U32);
             sCellFreqPriority = UEH_COMMON_SCELL_FREQ_PRIORITY_TDD;
            
             ELIB_TRACE_DECISION(
@@ -90,7 +107,21 @@ for (RnhNCellFreqInfoBaseIfPtrVectorD::const_iterator itFreq = nFreqInfoList.beg
                 eutranCellPtr->getCgi().eNodeBCellId.cellId,
                 sCellFreqPriority);
            
-          } 
+          }
+          else if((*cellInfoIter)->getCellFroRef().getFroType() == ELIB_CONST_EXTERNALEUTRANCELLTDD_FRO_TYPE)
+          {
+            // PCell FDD, sCell external TDD, add ESCell TDD
+            // SCell is external TDD. don't need to check the FroId.
+            saveEnbSCellCandidateInList(eutranCellPtr, sCellCandidateList, isDlOnlyFreq, true, pCellLbmId);
+            sCellFreqPriority = UEH_COMMON_SCELL_FREQ_PRIORITY_TDD;
+ 
+            ELIB_TRACE_DECISION(
+                Ft_UE_RAC_MEASUREMENTS,
+                "updateEnbSCellCandidateList::PCell FDD, External SCell TDD, add SCell TDD, isDlOnlyFreq=%d scell cellId=%d, sCellFreqPriority=%d",
+                isDlOnlyFreq,
+                eutranCellPtr->getCgi().eNodeBCellId.cellId,
+                sCellFreqPriority);
+          }
         }
         else if(cellDataPtr->getFroType() == ELIB_CONST_EUTRANCELLTDD_FRO_TYPE)
         {
@@ -101,7 +132,7 @@ for (RnhNCellFreqInfoBaseIfPtrVectorD::const_iterator itFreq = nFreqInfoList.beg
             if((*cellInfoIter)->getCellFroRef().getFroId() != cellDataPtr->getFroId())
             {
               //PCell TDD, SCell TDD add SCell TDD
-              saveEnbSCellCandidateInList(eutranCellPtr, sCellCandidateList, isDlOnlyFreq);
+              saveEnbSCellCandidateInList(eutranCellPtr, sCellCandidateList, isDlOnlyFreq, false, UEH_INVALID_U32);
               sCellFreqPriority = UEH_COMMON_SCELL_FREQ_PRIORITY_TDD;
              
               ELIB_TRACE_DECISION(
@@ -112,19 +143,19 @@ for (RnhNCellFreqInfoBaseIfPtrVectorD::const_iterator itFreq = nFreqInfoList.beg
                   sCellFreqPriority);
             }            
           }
-          else if((*cellInfoIter)->getCellFroRef().getFroType() == ELIB_CONST_EUTRANCELLFDD_FRO_TYPE)
+          else if((*cellInfoIter)->getCellFroRef().getFroType() == ELIB_CONST_EXTERNALEUTRANCELLTDD_FRO_TYPE)
           {
-            //PCell TDD, SCell FDD add SCell FDD
-            //SCell is FDD. don't need to check the FroId.
-            saveEnbSCellCandidateInList(eutranCellPtr, sCellCandidateList, isDlOnlyFreq);
-            sCellFreqPriority = UEH_COMMON_SCELL_FREQ_PRIORITY_FDD;
- 
-            ELIB_TRACE_DECISION(
-              Ft_UE_RAC_MEASUREMENTS,
-              "updateEnbSCellCandidateList::PCell TDD, SCell FDD, add SCell FDD, isDlOnlyFreq=%d scell cellId=%d, sCellFreqPriority=%d",
-              isDlOnlyFreq,
-              eutranCellPtr->getCgi().eNodeBCellId.cellId,
-              sCellFreqPriority);
+              //PCell TDD, SCell TDD add SCell TDD
+              //SCell candidate is external TDD, no need to check FroId
+              saveEnbSCellCandidateInList(eutranCellPtr, sCellCandidateList, isDlOnlyFreq, true, pCellLbmId);
+              sCellFreqPriority = UEH_COMMON_SCELL_FREQ_PRIORITY_TDD;
+             
+              ELIB_TRACE_DECISION(
+                  Ft_UE_RAC_MEASUREMENTS,
+                  "updateEnbSCellCandidateList::PCell TDD, external SCell TDD, add SCell TDD, isDlOnlyFreq=%d scell cellId=%d, sCellFreqPriority=%d",
+                  isDlOnlyFreq,
+                  eutranCellPtr->getCgi().eNodeBCellId.cellId,
+                  sCellFreqPriority);
           }
         }
       }
