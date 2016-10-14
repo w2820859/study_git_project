@@ -1,0 +1,24 @@
+if (i=0)
+{
+   aaaaaaa=bbbbbbb;
+}
+else
+{
+   bbbbbbb=aaaaaaa;
+}
+if (i=1)
+{
+   ccccccc=ddddddd;
+}
+else
+{
+   ccccccc=ddddddd;
+}
+if (i=2)
+{
+   fffffff=ggggggg;
+}
+else
+{
+   ggggggg=fffffff;
+}
