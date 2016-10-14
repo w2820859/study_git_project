@@ -6,14 +6,6 @@ else
 {
    bbbbbbb=aaaaaaa;
 }
-if (i=1)
-{
-   ccccccc=ddddddd;
-}
-else
-{
-   ccccccc=ddddddd;
-}
 if (i=2)
 {
    fffffff=ggggggg;
@@ -21,4 +13,12 @@ if (i=2)
 else
 {
    ggggggg=fffffff;
+}
+if (i=1)
+{
+   ccccccc=ddddddd;
+}
+else
+{
+   ccccccc=ddddddd;
 }
