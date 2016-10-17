@@ -6,7 +6,7 @@
 *              | |_| | (_) | |\  | (_) | |_| |__| (_| | | |_|_|
 *              |____/ \___/|_| \_|\___/ \__|_____\__,_|_|\__(_)
 *
-*                    File generated from Ifmtools/RedEye.
+*                    File generated from RedEye ver. 1.113
 *
 *****************************************************************************/
  
@@ -37,7 +37,7 @@ This .h-file defines the signal base for all system interfaces common in
 GSM, WCDMA and LTE RBS.
  
 spare for future use
-0x01741000 - 0x017FFFFF
+0x01740000 - 0x017FFFFF
 */
  
  
@@ -47,11 +47,12 @@ spare for future use
  
 /******************************** Includes **********************************/
 #ifdef MAKE_WITH_LPP
+#elif defined(LINUX)
+#include <bbiSignals_lppToLinuxTypes.h>
 #else
 /* By default we use OSE types. */
-#include "ose.h"
+#include <ose.h>
 #endif
- 
  
 /********************************* Defines **********************************/
 #ifndef LPP_CDA_STRUCT
@@ -68,14 +69,14 @@ spare for future use
 * sigbasegroup: ClibSigBaseGroupCrbs
 *//**
 * @brief                      The macro CRBS_SIGBASE defines the beginning
-*                             of the signal space for
+ *                             of the signal space for
 *                             the common RBS software. The signal space
-*                             ranges between
+ *                             ranges between
 *                             0x01700000 - 0x017FFFFF, and it is defined by
-*                             the Cello Design Rules
+ *                             the Cello Design Rules
 *                             document 3/10260-CSX10109 Uen.
-*
-****************************************************************************/
+*                            
+ ****************************************************************************/
 #define CRBS_SIGBASE    0x01700000
  
  
@@ -83,19 +84,19 @@ spare for future use
 * sigbasegroup: ClibSigBaseGroupCIG
 *//**
 * @brief                      Signal bases for Common Internode Control
-*                             Interfaces
+ *                             Interfaces
 *                             Space for 64 INCIs with 0x0100(256) signal
-*                             numbers each
-*
-*                             next INCI
-*                             #define XXX_INCI_SIGBASE     (INCI_SIGBASE
-*                             + 0x00100)
-*
-*                             last INCI
-*                             #define YYY_INCI_SIGBASE     (INCI_SIGBASE
-*                             + 0x03F00)
-*
-****************************************************************************/
+ *                             numbers each
+*                            
+ *                             next INCI
+*                             #define XXX_INCI_SIGBASE     (INCI_SIGBASE   
+ *                             + 0x00100)
+*                            
+ *                             last INCI
+*                             #define YYY_INCI_SIGBASE     (INCI_SIGBASE   
+ *                             + 0x03F00)
+*                             
+ ****************************************************************************/
 #define INCI_SIGBASE        (CRBS_SIGBASE + 0x00000)
 #define APC_INCI_SIGBASE    (INCI_SIGBASE + 0x00000)
  
@@ -104,16 +105,16 @@ spare for future use
 * sigbasegroup: ClibSigBaseGroupCSI
 *//**
 * @brief                      Signal bases for Common Subsystem Interfaces
-*
-*                             Space for 30 Subsystems with
-*                             0x1000(4096) signal numbers for subsystem
-*                             external interfaces
+*                            
+ *                             Space for 30 Subsystems with
+ *                             0x1000(4096) signal numbers for subsystem
+ *                             external interfaces
 *                             and 0x1000(4096) signal numbers for subsystem
-*                             internal interfaces
-*
-*                             Note: The signal base per subsystem internal
-*                             interface is defined in a sigbase file
-*                             belonging to the subsystem.
+ *                             internal interfaces
+*                            
+ *                             Note: The signal base per subsystem internal
+ *                             interface is defined in a sigbase file
+ *                             belonging to the subsystem.
 ****************************************************************************/
 #define CSUBSYS_SIGBASE    (CRBS_SIGBASE + 0x04000)
  
@@ -149,9 +150,6 @@ spare for future use
 #define TR_DCI_SIGBASE    (CSUBSYS_SIGBASE + 0x02000)
 #define LTU_SIGBASE       (CSUBSYS_SIGBASE + 0x027C0)
 #define ANTP_SIGBASE      (CSUBSYS_SIGBASE + 0x02800)
-#define DC_RDS_SIGBASE    (CSUBSYS_SIGBASE + 0x02900)
-#define RMC_SIGBASE       (CSUBSYS_SIGBASE + 0x02A00)
-#define RFT_SIGBASE       (CSUBSYS_SIGBASE + 0x02B00)
  
  
 /*****************************************************************************
@@ -167,41 +165,40 @@ spare for future use
 *//**
 * @brief                      next subsystem XXX external interfaces
 *                             #define XXX_EXT_SIGBASE      (CSUBSYS_SIGBASE
-*                             + 0x06000)
+ *                             + 0x06000)
 *                             define signal base, one per external interface
-*
-*                             Subsystem XXX internal interfaces sigbase
+*                            
+ *                             Subsystem XXX internal interfaces sigbase
 *                             #define XXX_INT_SIGBASE      (CSUBSYS_SIGBASE
-*                             + 0x07000)
-*
-*                             last subsystem YYY external interfaces
+ *                             + 0x07000)
+*                            
+ *                             last subsystem YYY external interfaces
 *                             #define YYY_EXT_SIGBASE      (CSUBSYS_SIGBASE
-*                             + 0x3E000)
+ *                             + 0x3E000)
 *                             define signal base, one per external interface
-*
-*                             Subsystem YYY internal interfaces sigbase
+*                            
+ *                             Subsystem YYY internal interfaces sigbase
 *                             #define YYY_INT_SIGBASE      (CSUBSYS_SIGBASE
-*                             + 0x3F000)
-*
-****************************************************************************/
+ *                             + 0x3F000)
+*                            
+ ****************************************************************************/
  
  
 /*****************************************************************************
 * sigbasegroup: ClibSigBaseGroupLte
 *//**
 * @brief                      WP483 moved/(copied) from
-*                             /vobs/erbs/elib/commonBl/commonLU/inc/ and
-*
-*                             /vobs/erbs/elib/constBl/constIfU/inc
-*
-****************************************************************************/
+ *                             /vobs/erbs/elib/commonBl/commonLU/inc/ and
+*                                                       
+ *                             /vobs/erbs/elib/constBl/constIfU/inc
+*                            
+ ****************************************************************************/
 #define CRBS_BC_SIGBASE                      0x01658000L
 #define ELIB_BC_BASIC_SIGBASE                (CRBS_BC_SIGBASE + 0x0000)
 #define ELIB_BC_PID_SIGBASE                  (CRBS_BC_SIGBASE + 0x0200)
 #define ELIB_BC_STATE_HANDLING_SIGBASE       (CRBS_BC_SIGBASE + 0x0400)
 #define ELIB_BC_LOADABLE_SIGBASE             (CRBS_BC_SIGBASE + 0x0800)
 #define ELIB_DC_BASIC_SIGBASE                (CRBS_BC_SIGBASE + 0x0C00)
-#define CRBS_BC_CONST_SIGBASE                (CRBS_BC_SIGBASE + 0x0D00)
 #define ELIB_BC_ETH_SIGBASE                  (CRBS_BC_SIGBASE + 0x1000)
 #define ELIB_BC_TEMPERATURE_SIGBASE          (CRBS_BC_SIGBASE + 0x1100)
 #define ELIB_BC_HWLOG_SIGBASE                (CRBS_BC_SIGBASE + 0x1200)
@@ -209,9 +206,39 @@ spare for future use
 #define ELIB_BC_ISBS_SIGBASE                 (CRBS_BC_SIGBASE + 0x1600)
 #define ELIB_BC_UCTOOLS_SIGBASE              (CRBS_BC_SIGBASE + 0x1700)
 #define ELIB_BC_LOCKABLE_RESOURCE_SIGBASE    (CRBS_BC_SIGBASE + 0x1800)
-#define ELIB_BC_IQ_SIGBASE                   (CRBS_BC_SIGBASE + 0x1900)
-#define ELIB_BC_SPECIAL_INDICATOR_SIGBASE    (CRBS_BC_SIGBASE + 0x1A00)
-#define ELIB_BC_RECOVERY_SIGBASE             (CRBS_BC_SIGBASE + 0x2000)
+ 
+ 
+/*****************************************************************************
+* sigbasegroup: ClibSigBaseGroupAnt
+*//**
+* @brief                      sigbasegroup: ElibCommonOseSigBase copied
+ *                             from elibCommonOseSigBase
+*                            
+ *                             /vobs/erbs/elib/constBl/constIfU/inc/elibConstOseSigBases.h
+*                                                       
+ *                                                               
+ *                            
+ * @param CRBS_ANT_SIGBASE     same as LTERBS_ANT_SIGBASE
+* @param CRBS_NC_SIGBASE      same as LTERBS_NC_SIGBASE
+* @param CRBS_NCI_SIGBASE     same as LTERBS_NCI_SIGBASE
+* @param CRBS_OMF_SIGBASE     same as LTERBS_OMF_SIGBASE
+* @param CRBS_RADIO_SIGBASE   same as LTERBS_RADIO_SIGBASE
+****************************************************************************/
+#define CRBS_ANT_SIGBASE              0x01660000L
+#define CRBS_NC_SIGBASE               0x01630000L
+#define CRBS_NCI_SIGBASE              0x01648000L
+#define CRBS_OMF_SIGBASE              0x01628000L
+#define CRBS_RADIO_SIGBASE            0x01640000L
+#define ELIB_ANT_EPA_SIGBASE          (CRBS_ANT_SIGBASE + 0)
+#define ELIB_ANT_EPA_ATMAU_SIGBASE    (CRBS_ANT_SIGBASE + 0x200)
+#define ELIB_ANT_EPA_RETU_SIGBASE     (CRBS_ANT_SIGBASE + 0x400)
+#define ELIB_ANT_EPA_RET_SIGBASE      (CRBS_ANT_SIGBASE + 0x600)
+#define ELIB_NC_NCMI_SIGBASE          (CRBS_NC_SIGBASE + 0)
+#define ELIB_NC_NCLI_SIGBASE          (CRBS_NC_SIGBASE + 0x200)
+#define ELIB_NC_LRCI_SIGBASE          (CRBS_NC_SIGBASE + 0x400)
+#define ELIB_RICM_SIGBASE             (CRBS_NCI_SIGBASE + 0)
+#define ELIB_OMF_MAO_PNP_SIGBASE      (CRBS_OMF_SIGBASE + 0x300)
+#define ELIB_TR_SIGBASE               (CRBS_RADIO_SIGBASE + 0)
  
  
 /*****************************************************************************
@@ -238,146 +265,6 @@ spare for future use
 #define RIC_SIGBASE       0x01019000
 #define RICRAI_SIGBASE    RIC_SIGBASE
 #define RICI_SIGBASE      (RIC_SIGBASE+0x200)
- 
- 
-/*****************************************************************************
-* sigbasegroup: ClibSigBaseGroupXmuExt
-*//**
-* @brief                      Signal bases for XMU DCI server.
-****************************************************************************/
-#define XMU_EXT_SIGBASE    (CSUBSYS_SIGBASE + 0x06000)
-#define XMU_DCI_SIGBASE    (XMU_EXT_SIGBASE + 0x00000)
- 
- 
-/*****************************************************************************
-* sigbasegroup: ClibSigBaseGroupXmuInt
-*//**
-* @brief                      -
-****************************************************************************/
-#define XMU_INT_SIGBASE    (CSUBSYS_SIGBASE + 0x06800)
- 
- 
-/*****************************************************************************
-* sigbasegroup: ClibSigBaseGroupNc
-*//**
-* @brief                      -
-****************************************************************************/
-#define CRBS_NC_SIGBASE         (CSUBSYS_SIGBASE + 0x08000)
-#define ELIB_NC_NCMI_SIGBASE    (CRBS_NC_SIGBASE + 0)
-#define ELIB_NC_NCLI_SIGBASE    (CRBS_NC_SIGBASE + 0x200)
-#define ELIB_NC_LRCI_SIGBASE    (CRBS_NC_SIGBASE + 0x400)
- 
- 
-/*****************************************************************************
-* sigbasegroup: ClibSigBaseGroupAnt
-*//**
-* @brief                      -
-****************************************************************************/
-#define CRBS_ANT_SIGBASE              (CSUBSYS_SIGBASE + 0x0A000)
-#define ELIB_ANT_EPA_SIGBASE          (CRBS_ANT_SIGBASE + 0)
-#define ELIB_ANT_EPA_ATMAU_SIGBASE    (CRBS_ANT_SIGBASE + 0x200)
-#define ELIB_ANT_EPA_RETU_SIGBASE     (CRBS_ANT_SIGBASE + 0x400)
-#define ELIB_ANT_EPA_RET_SIGBASE      (CRBS_ANT_SIGBASE + 0x600)
- 
- 
-/*****************************************************************************
-* sigbasegroup: ClibSigBaseGroupFw
-*//**
-* @brief                      The signal range for the FW group includes
-*                             space for 16 interfaces with 256 signal
-*                             numbers each.
-****************************************************************************/
-#define CRBS_FW_SIGBASE               (CRBS_SIGBASE + 0x40000)
-#define CRBS_RSARTE_FRO_SIGBASE       (CRBS_FW_SIGBASE + 0x00000)
-#define CRBS_IRCC_SIGBASE             (CRBS_FW_SIGBASE + 0x00100)
-#define CRBS_OMF_SIGBASE              (CRBS_FW_SIGBASE + 0x00200)
-#define CRBS_CPLUSPLUS_FRO_SIGBASE    (CRBS_FW_SIGBASE + 0x00300)
- 
- 
-/*****************************************************************************
-* sigbasegroup: ClibSigBaseGroupOmf
-*//**
-* @brief                      -
-****************************************************************************/
-#define CRBS_OMF_MAO_IMA_SIGBASE    (CRBS_OMF_SIGBASE + 0x00000)
-#define CRBS_OMF_MAO_PIC_SIGBASE    (CRBS_OMF_SIGBASE + 0x00010)
-#define CRBS_OMF_MAO_PNP_SIGBASE    (CRBS_OMF_SIGBASE + 0x00020)
- 
- 
-/*****************************************************************************
-* sigbasegroup: ClibSigBaseGroupFudExternal
-*//**
-* @brief                      sigbasegroup: ClibSigBaseGroupFudExternal
-*
-*                             @brief  Signal bases for FUD external
-*                             interfaces, both
-*                             CAT-RAT and FUD-FUD in CAT.
-*                             Space for 512 (Hex 200) interfaces with
-*                             512 (Hex 200) signal numbers each, in total
-*                             2612144 (Hex 40000) signal numbers.
-*
-*                             The actual allocation of the signal number
-*                             space differs per interface. Small interfaces,
-*                             expected to be stable, allocate 64 (Hex 40)
-*                             signal numbers. Big and volatile interfaces
-*                             allocate 1024 (Hex 400) signal numbers.
-*
-*
-****************************************************************************/
-#define FUD_EXT_SIGBASE                   (CRBS_SIGBASE + 0x41000)
-#define CARRIER_GROUP_CTRL_SIGBASE        (FUD_EXT_SIGBASE + 0x00000)
-#define CARRIER_GROUP_ADM_SIGBASE         (FUD_EXT_SIGBASE + 0x00400)
-#define CARRIER_GROUP_QUERY_SIGBASE       (FUD_EXT_SIGBASE + 0x00500)
-#define BB_LOADING_SIGBASE                (FUD_EXT_SIGBASE + 0x00600)
-#define BB_RESOURCE_SET_CTRL_SIGBASE      (FUD_EXT_SIGBASE + 0x00800)
-#define BB_RESOURCE_SET_ADM_SIGBASE       (FUD_EXT_SIGBASE + 0x00A00)
-#define TIMING_DISTRIBUTION_SIGBASE       (FUD_EXT_SIGBASE + 0x00C00)
-#define LICENSE_FEATURE_CTRL_SIGBASE      (FUD_EXT_SIGBASE + 0x00D00)
-#define LICENSE_CAPACITY_CTRL_SIGBASE     (FUD_EXT_SIGBASE + 0x00E00)
-#define RI_AXC_SERVICES_SIGBASE           (FUD_EXT_SIGBASE + 0x00F00)
-#define UDP_CONTROL_SIGBASE               (FUD_EXT_SIGBASE + 0x01000)
-#define GTPU_CONTROL_SIGBASE              (FUD_EXT_SIGBASE + 0x01100)
-#define TNL_SESSION_CONTROL_SIGBASE       (FUD_EXT_SIGBASE + 0x01200)
-#define IP_HOST_ADMINISTRATION_SIGBASE    (FUD_EXT_SIGBASE + 0x01300)
-#define FRU_MANAGER_CTRL_SIGBASE          (FUD_EXT_SIGBASE + 0x01400)
-#define FRU_MANAGER_QUERY_SIGBASE         (FUD_EXT_SIGBASE + 0x01500)
-#define FRU_MANAGER_DELEGATE_SIGBASE      (FUD_EXT_SIGBASE + 0x01600)
-#define PM_AGENT_REGISTRATION_SIGBASE     (FUD_EXT_SIGBASE + 0x01700)
-#define PM_COUNTER_COLLECT_SIGBASE        (FUD_EXT_SIGBASE + 0x01800)
-#define PM_SCANNER_CONTROL_SIGBASE        (FUD_EXT_SIGBASE + 0x01900)
-#define HWI_MANAGER_CTRL_SIGBASE          (FUD_EXT_SIGBASE + 0x01A00)
-#define UNIT_SUBSCRIPTION_SIGBASE         (FUD_EXT_SIGBASE + 0x01B00)
-#define SFP_MANAGEMENT_SIGBASE            (FUD_EXT_SIGBASE + 0x02300)
- 
- 
-/*****************************************************************************
-* sigbasegroup: ClibSigBaseGroupNci
-*//**
-* @brief                      sigbasegroup: ElibCommonOseSigBase copied
-*                             from elibCommonOseSigBase
-*
-*                             /vobs/erbs/elib/constBl/constIfU/inc/elibConstOseSigBases.h
-*
-*
-* @param CRBS_NCI_SIGBASE     same as LTERBS_NCI_SIGBASE
-****************************************************************************/
-#define CRBS_NCI_SIGBASE     0x01648000L
-#define ELIB_RICM_SIGBASE    (CRBS_NCI_SIGBASE + 0)
- 
- 
-/*****************************************************************************
-* sigbasegroup: ClibSigBaseGroupRadio
-*//**
-* @brief                      sigbasegroup: ElibCommonOseSigBase copied
-*                             from elibCommonOseSigBase
-*
-*                             /vobs/erbs/elib/constBl/constIfU/inc/elibConstOseSigBases.h
-*
-*
-* @param CRBS_RADIO_SIGBASE   same as LTERBS_RADIO_SIGBASE
-****************************************************************************/
-#define CRBS_RADIO_SIGBASE    0x01640000L
-#define ELIB_TR_SIGBASE       (CRBS_RADIO_SIGBASE + 0)
  
 /******************** Double inclusion protection (end) *********************/
 #endif /* CRBS_SIG_BASES_H */
