@@ -95,7 +95,7 @@ spare for future use
  *                             last INCI
 *                             #define YYY_INCI_SIGBASE     (INCI_SIGBASE   
  *                             + 0x03F00)
-*                             
+*                            
  ****************************************************************************/
 #define INCI_SIGBASE        (CRBS_SIGBASE + 0x00000)
 #define APC_INCI_SIGBASE    (INCI_SIGBASE + 0x00000)
@@ -171,7 +171,7 @@ spare for future use
  *                             Subsystem XXX internal interfaces sigbase
 *                             #define XXX_INT_SIGBASE      (CSUBSYS_SIGBASE
  *                             + 0x07000)
-*                            
+*                             
  *                             last subsystem YYY external interfaces
 *                             #define YYY_EXT_SIGBASE      (CSUBSYS_SIGBASE
  *                             + 0x3E000)
@@ -189,7 +189,7 @@ spare for future use
 *//**
 * @brief                      WP483 moved/(copied) from
  *                             /vobs/erbs/elib/commonBl/commonLU/inc/ and
-*                                                       
+*                                                      
  *                             /vobs/erbs/elib/constBl/constIfU/inc
 *                            
  ****************************************************************************/
