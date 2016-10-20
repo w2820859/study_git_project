@@ -1,579 +1,320 @@
-// Basic CA: find the unique candidate scell based on the configured 
-enbSCellFreqCandidateList
+89.8在check中增加部分
  
-// PCell---------------------------------------------------------------------
----
-bool isMfbiSupported = ueCtxtDataPtr->getUehCommonDataPtr()->
-getOptionalFeaturesPtr()->isServiceStateOperable(
-ELIB_CONST_LICENSE_MULTI_FREQ_BAND_ID);
- 
-//***********WP5413**START**********
-bool isCmccFtMfbiEnhSupported = false;
-RnhRadioConfEUtranGenericCellIfPtrD cellPtr = ueCtxtDataPtr->getCellDataPtr()
-->getConfigurationDataPtr()->getservingEUtranGenericCell();
-if (cellPtr->getFroRef().getFroType() == ELIB_CONST_EUTRANCELLTDD_FRO_TYPE)
+//STARTING: Fast Track WP4989 CA Scell config/deconfig via A2/A4 REDO WP4007
+//init local var
+// PCell------------------------------------------------------------------------
+bool isMfbiSupported = ueCtxtDataPtr->getUehCommonDataPtr()->getOptionalFeaturesPtr()->isServiceStateOperable(ELIB_CONST_LICENSE_MULTI_FREQ_BAND_ID);
+RnhNCellEUtranGenericFrequencyD pCellGenericFrequency;
+RnhNCellFreqBandUtilD::getSourceCellGenericFrequency(ueCtxtDataPtr->getCellDataPtr()->getConfigurationDataPtr()->getservingEUtranGenericCell(), pCellGenericFrequency);
+U32 pCellUeEarfcn = RnhNCellFreqBandUtilD::getUeEarfcn(eutranCapabilitiesPtr, &pCellGenericFrequency, isMfbiSupported);
+bool isTddSCell = false;
+U32VectorD ueCaSupportedBandList;
+U32 pCellUeFreqBand = eutranCapabilitiesPtr->getCaSupportedBands(pCellUeEarfcn, ueCaSupportedBandList);
+if(ueCaSupportedBandList.empty())
 {
-  S32 zzzTemporary10 = ((RnhRadioConfEUtranCellTDDIfPtrD)cellPtr)->
-zzzTemporary10;
+  return false;
+}
  
-  if((zzzTemporary10 != -2000000000) && (zzzTemporary10 & 0x01)&& (
-ueCtxtDataPtr->getSysConstValue(SYS_CONST_CMCC_FT_MFBI_ENH_ENABLED_ID)))
+const RnhRadioConfConfigurationDataPtrD momDataPtr= ueCtxtDataPtr->getCellDataPtr()->getConfigurationDataPtr();
+U32 pCellBandwidth = RnhNCellUtilD::getEutranNdlBandWidth(momDataPtr->getservingEUtranGenericCell());
+S32 noOfChannelSelectionSets = momDataPtr->getservingEUtranGenericCell()->noOfChannelSelectionSets;
+ 
+ELIB_TRACE_UE_LEVEL2(ueCtxtDataPtr->getUeTraceHandlerPtr(),
+                        ueCtxtDataPtr->getRacUeRef(),
+                        Ft_CARRIER_AGGREGATION,
+                        "checkSCellCandidate: ServingCell earfcn %d, bandWidth %d, Band %d.",
+                        pCellUeEarfcn,
+                        pCellBandwidth,
+                        pCellUeFreqBand);
+ 
+if(pCellBandwidth < 5000 || noOfChannelSelectionSets <= 0)
+{
+  //pcell bandwidth less than 5MHz, no sCell candidate should be found
+  ELIB_TRACE_UE_LEVEL2(ueCtxtDataPtr->getUeTraceHandlerPtr(),
+                          ueCtxtDataPtr->getRacUeRef(),
+                          uehUeBl_SCellEvalSwU,
+                          "checkSCellCandidate: Pcell bandwidth less than 5MHz or "
+                          "noOfChannelSelectionSets is not set, no sCell candidate should be found. "
+                          "Pcell bandwidth = %d.noOfChannelSelectionSets = %d", pCellBandwidth, noOfChannelSelectionSets);
+  return false;
+}
+ 
+U32 servingCellId = ueCtxtDataPtr->getCellDataPtr()->getCellId();
+U32 servingCellDuId = ueCtxtDataPtr->getCellDataPtr()->getServingCellHandlerPtr()->getDuId(servingCellId);
+// PCell end------------------------------------------------------------------------
+ 
+// Cross Du License --------------------------------------------------------------------------------------------------------------------------------------
+bool isCrossDuSupported = caLicenseManagerPtr->isCrossDuCaLicenseEnabled();
+// END init local var
+//ENDING: Fast Track WP4989
+ 
+ 
+// SCell--------------------------------------------------------------------------------------
+const RnhNCellEUtranCellGenericInfoIfD* sCellInfoPtr =
+  ueCtxtDataPtr->getFreqInfo().getLookupByCgiHandler()->getEUtranCellInfo(servingCellId, inCellIter->cgi);
+    
+// Cross Du ---------------------------------------------------------------------------------------------------------
+U32 sCellDuId = ueCtxtDataPtr->getCellDataPtr()->getServingCellHandlerPtr()->getDuId(inCellIter->cgi.eNodeBCellId.cellId);
+    
+// ------------------------------------------------------------------------------------------------------------------
+  
+if ((!sCellInfoPtr->getHasRelation(servingCellId)) ||
+    (!sCellSelectionPolicyCommonPtr->isSCellCandidateValid(sCellInfoPtr)))
+{
+  return false;
+}
+ 
+// Further filter potential SCell based on Cross DU License
+if (!isCrossDuSupported)
+{
+  // No Cross Du license
+  // Ensure that this potential SCell candidate is on the same DU as the ServingCell
+    
+  if (servingCellDuId != sCellDuId)
   {
-    if(ueCtxtDataPtr->getFuncState() == 
-UEH_COMMON_FUNC_STATE_X2_INCOMING_HANDOVER)
-    {
-      const CellIdT& servingCellId = ueCtxtDataPtr->getCellDataPtr()->
-getCellId();
-      UehCommonCtxtX2HODataD comX2HOData = ueCtxtDataPtr->getComX2HOData();
-      const RnhNCellEUtranCellGenericInfoIfD* SourceCellInfoPtr = 
-ueCtxtDataPtr->getFreqInfo().getLookupByCgiHandler()->getEUtranCellInfo(
-servingCellId, comX2HOData.sourceEcgi);
-      S32 sourceCellzzzTemporary57 = SourceCellInfoPtr->getZzzTemporary57();
-      if (sourceCellzzzTemporary57 != -2000000000)
-        isCmccFtMfbiEnhSupported = true;
+    // ServingCell and Scell are not on the same DU, skip this SCell
+    
+    ELIB_TRACE_UE_LEVEL2(
+      ueCtxtDataPtr->getUeTraceHandlerPtr(),
+      ueCtxtDataPtr->getRacUeRef(),
+      Ft_CARRIER_AGGREGATION,
+      "checkSCellCandidate: Skipping SCell %d. ServingCell %d Du Id = %d  SCell Du Id = %d",
+      inCellIter->cgi.eNodeBCellId.cellId,
+      servingCellId,
+      servingCellDuId,
+      sCellDuId);
+        
+    return false;
+  }
+}
+else
+{
+  // Cross Du license Enabled
+  // Ensure that there are no cases where the ServingCell or Scell is on Du > 2 and the other is on a different Du
+  // This else condition can be removed in the future when we allow CA across any DU.
  
-    }
-    else
+  if ((servingCellDuId > 2) || (sCellDuId > 2))
+  {
+    if (servingCellDuId != sCellDuId)
     {
-      isCmccFtMfbiEnhSupported = true;
+      // ServingCell and Scell are not on the same DU, skip this SCell
+ 
+      ELIB_TRACE_UE_LEVEL2(
+         ueCtxtDataPtr->getUeTraceHandlerPtr(),
+         ueCtxtDataPtr->getRacUeRef(),
+         Ft_CARRIER_AGGREGATION,
+         "checkSCellCandidate: Skipping SCell %d. ServingCell %d Du Id = %d  SCell Du Id = %d",
+         inCellIter->cgi.eNodeBCellId.cellId,
+         servingCellId,
+         servingCellDuId,
+         sCellDuId);
+    
+      return false;
     }
   }
 }
-//***********WP5413**END**********
+    
+ELIB_TRACE_UE_LEVEL2(ueCtxtDataPtr->getUeTraceHandlerPtr(),
+                        ueCtxtDataPtr->getRacUeRef(),
+                        Ft_CARRIER_AGGREGATION,
+                        "checkSCellCandidate: scell Barred %d, scell DlOnly %d, Dl Supplementary SCell License service state %d.",
+                        sCellInfoPtr->getCellBarred(),
+                        sCellInfoPtr->getIsDlOnly(),
+                        caLicenseManagerPtr->checkDlSupplemntaryScellLicense());
  
-RnhNCellEUtranGenericFrequencyD pCellGenericFrequency;
-RnhNCellFreqBandUtilD::getSourceCellGenericFrequency(ueCtxtDataPtr->
-getCellDataPtr()->getConfigurationDataPtr()->getservingEUtranGenericCell(), 
-pCellGenericFrequency);
- 
-const RnhNCellEUtranCellGenericInfoIfD* cellInfoPtr =
-    ueCtxtDataPtr->getFreqInfo().getLookupByCgiHandler()->getEUtranCellInfo(
-ueCtxtDataPtr->getCellId(),
-                                                                            
-ueCtxtDataPtr->getCgi());
- 
-U32VectorD pCellUeEarfcnList = sCellSelectionPolicyCommonPtr->getUeEarfcnList(
-eutranCapabilitiesPtr,
-                                                                              
-cellInfoPtr,
-                                                                              
-ueCtxtDataPtr->getServingUeEarfcn());
-U32 pCellUeEarfcn;
-bool isTddSCell;
-U32VectorD ueCaSupportedBandList;
-U32 pCellUeFreqBand;
- 
-for (U32VectorD::iterator ueEarfcnIter = pCellUeEarfcnList.begin(); 
-ueEarfcnIter != pCellUeEarfcnList.end(); ueEarfcnIter++)
+if ((sCellInfoPtr->getCellBarred() == 0) ||
+    (sCellInfoPtr->getIsDlOnly() == 1))
 {
-  pCellUeEarfcn = *ueEarfcnIter;
-  isTddSCell = false;
-  ueCaSupportedBandList.clear();
- 
-  pCellUeFreqBand = eutranCapabilitiesPtr->getCaSupportedBands(pCellUeEarfcn, 
-ueCaSupportedBandList);
- 
-  if(ueCaSupportedBandList.empty())
+  // cell is Barred or DlOnly
+  if (!caLicenseManagerPtr->checkDlSupplemntaryScellLicense())
   {
-    continue; // check next earfcn
+    // Dl only License is not OPEARABLE
+    return false;
   }
+}
  
-  const RnhRadioConfConfigurationDataPtrD momDataPtr= ueCtxtDataPtr->
-getCellDataPtr()->getConfigurationDataPtr();
-  U32 pCellBandwidth = RnhNCellUtilD::getEutranNdlBandWidth(momDataPtr->
-getservingEUtranGenericCell());
-  S32 noOfChannelSelectionSets = momDataPtr->getservingEUtranGenericCell()->
-noOfChannelSelectionSets;
- 
-  ELIB_TRACE_UE_LEVEL2(ueCtxtDataPtr->getUeTraceHandlerPtr(),
-                     ueCtxtDataPtr->getRacUeRef(),
-                     Ft_CARRIER_AGGREGATION,
-                     "findCandidateScell: ServingCell earfcn %d, bandWidth %d
-, Band %d.",
-                     pCellUeEarfcn,
-                     pCellBandwidth,
-                     pCellUeFreqBand);
- 
-  if(pCellBandwidth < 5000 || noOfChannelSelectionSets <= 0)
-  {
-    //pcell bandwidth less than 5MHz, no sCell candidate should be found
-    ELIB_TRACE_UE_LEVEL2(ueCtxtDataPtr->getUeTraceHandlerPtr(),
-                               ueCtxtDataPtr->getRacUeRef(),
-                               uehUeBl_SCellEvalSwU,
-                               "findCandidateScell: Pcell bandwidth less than 
-5MHz or "
-                               "noOfChannelSelectionSets is not set, no sCell 
-candidate should be found. "
-                               "Pcell bandwidth = %d.noOfChannelSelectionSets 
-= %d", pCellBandwidth, noOfChannelSelectionSets);
-    return;
-  }
- 
-  U32 servingCellId = ueCtxtDataPtr->getCellDataPtr()->getCellId();
-  U32 servingCellDuId = ueCtxtDataPtr->getCellDataPtr()->
-getServingCellHandlerPtr()->getDuId(servingCellId);
-  // PCell end---------------------------------------------------------------
----------
- 
-  // Cross Du License -------------------------------------------------------
--------------------------------------------------------------------------------
-  bool isCrossDuSupported = caLicenseManagerPtr->isCrossDuCaLicenseEnabled();
-  U8 numOfSCellOperationDisabled = 0;
-  U8 numOfSCellAdminUnlock = 0;
- 
-  UehCommonCtxtEnbSCellFreqCandidateVectorD enbSCellFreqCandidateList = 
-ueCtxtDataPtr->getCellDataPtr()->getEnbSCellFreqCandidateList();
- 
-  for (UehCommonCtxtEnbSCellFreqCandidateVectorD::iterator freqIter = 
-enbSCellFreqCandidateList.begin();
-     freqIter != enbSCellFreqCandidateList.end();
-     freqIter++)
-  {
-   UehCommonCtxtEnbSCellCandidateVectorD enbSCellCandidateList = freqIter->
-getSCellCandidateList();
- 
-   for(UehCommonCtxtEnbSCellCandidateVectorD::iterator cellIter = 
-enbSCellCandidateList.begin();
-       cellIter != enbSCellCandidateList.end();
-       cellIter++)
-   {
-     bool isExternalSCell = false;
-     isTddSCell = false;
-     // SCell----------------------------------------------------------------
-----------------------
-     const RnhNCellEUtranCellGenericInfoIfD* sCellInfoPtr =
-         ueCtxtDataPtr->getFreqInfo().getLookupByCgiHandler()->
-getEUtranCellInfo(servingCellId, cellIter->cgi);
- 
-     if(cellIter->isExternalSCell)
-     {
-       ELIB_TRACE_UE_LEVEL2(
-           ueCtxtDataPtr->getUeTraceHandlerPtr(),
-           ueCtxtDataPtr->getRacUeRef(),
-           Ft_CARRIER_AGGREGATION,
-           "findCandidateScell Handling external SCell Candidate. SCell CGI=%
-s cellId=%d.",
-           cellIter->cgi.toDecimal().c_str(),
-           cellIter->cellId);
-       isExternalSCell = true;
-     }
- 
-     U32 sCellDuId = UEH_INVALID_U32;
-     if (!isExternalSCell)
-     {
-       // Cross Du ----------------------------------------------------------
------------------------------------------------
-       sCellDuId = ueCtxtDataPtr->getCellDataPtr()->getServingCellHandlerPtr()
-->getDuId(cellIter->cgi.eNodeBCellId.cellId);         
-       // -------------------------------------------------------------------
------------------------------------------------
-     }
- 
-     if ((!sCellInfoPtr->getHasRelation(servingCellId)) ||
-         (!sCellSelectionPolicyCommonPtr->isSCellCandidateValid(sCellInfoPtr, 
-isExternalSCell, numOfSCellOperationDisabled, numOfSCellAdminUnlock)))
-     {
-       continue;
-     }
- 
-     if (!isExternalSCell)
-     {
-     // Further filter potential SCell based on Cross DU License
-     if (!isCrossDuSupported)
-     {
-       // No Cross Du license
-       // Ensure that this potential SCell candidate is on the same DU as the 
-ServingCell
- 
-       if (servingCellDuId != sCellDuId)
-       {
-         // ServingCell and Scell are not on the same DU, skip this SCell
- 
-         ELIB_TRACE_UE_LEVEL2(
-             ueCtxtDataPtr->getUeTraceHandlerPtr(),
-             ueCtxtDataPtr->getRacUeRef(),
-             Ft_CARRIER_AGGREGATION,
-             "findCandidateScell: Skipping SCell %d. ServingCell %d Du Id = %
-d  SCell Du Id = %d",
-             cellIter->cgi.eNodeBCellId.cellId,
-             servingCellId,
-             servingCellDuId,
-             sCellDuId);
- 
-         continue;
-       }
-     }
-     else
-     {
-       // Cross Du license Enabled
-       // Ensure that there are no cases where the ServingCell or Scell is on 
-Du > 2 and the other is on a different Du
-       // This else condition can be removed in the future when we allow CA 
-across any DU.
- 
-       if ((servingCellDuId > 2) || (sCellDuId > 2))
-       {
-         if (servingCellDuId != sCellDuId)
-         {
-           // ServingCell and Scell are not on the same DU, skip this SCell
- 
-           ELIB_TRACE_UE_LEVEL2(
-             ueCtxtDataPtr->getUeTraceHandlerPtr(),
-             ueCtxtDataPtr->getRacUeRef(),
-             Ft_CARRIER_AGGREGATION,
-             "findCandidateScell: Skipping SCell %d. ServingCell %d Du Id = %
-d  SCell Du Id = %d",
-             cellIter->cgi.eNodeBCellId.cellId,
-             servingCellId,
-             servingCellDuId,
-             sCellDuId);
- 
-           continue;
-         }
-       }
-     }
-     }
- 
-     ELIB_TRACE_UE_LEVEL2(ueCtxtDataPtr->getUeTraceHandlerPtr(),
-                          ueCtxtDataPtr->getRacUeRef(),
-                          Ft_CARRIER_AGGREGATION,
-                          "findCandidateScell: scell Barred %d, scell DlOnly %
-d, Dl Supplementary SCell License service state %d isExternalSCell=%d.",
-                          sCellInfoPtr->getCellBarred(),
-                          sCellInfoPtr->getIsDlOnly(),
-                          caLicenseManagerPtr->checkDlSupplemntaryScellLicense
-(),
-                          isExternalSCell);
- 
-     if ((sCellInfoPtr->getCellBarred() == 0) ||
-         (sCellInfoPtr->getIsDlOnly() == 1))
-     {
-       // cell is Barred or DlOnly
-       if (!caLicenseManagerPtr->checkDlSupplemntaryScellLicense())
-       {
-         // Dl only License is not OPEARABLE
-         continue;
-       }
-     }
- 
-     RnhCommonSCellCandidateE sCellCandidate = RnhCommonSCellCandidateE(
-sCellInfoPtr->getSCellCandidate(servingCellId));
- 
-     ELIB_TRACE_UE_LEVEL2(ueCtxtDataPtr->getUeTraceHandlerPtr(),
-                                     ueCtxtDataPtr->getRacUeRef(),
-                                     Ft_CARRIER_AGGREGATION,
-                                     "sCellCandidate %d.",
-                                     sCellCandidate);
- 
-     if ((sCellCandidate == RNH_COMMON_SCELLCANDIDATE_ALLOWED) || (
-sCellCandidate == RNH_COMMON_SCELLCANDIDATE_ONLY_ALLOWED_FOR_DL))
-     {
-       S32 sCellTxModeConfigureInMom = sCellInfoPtr->getConfiguredTxMode();
-       S16 sCellTxMode;
-       S32 sCellNoOfUsedTxAntenna = UEH_INVALID_S32;
+if (sCellInfoPtr->getSCellCandidate(servingCellId) == 1)
+{
+  S32 sCellTxModeConfigureInMom = sCellInfoPtr->getConfiguredTxMode();
+  S16 sCellTxMode;
+  S32 sCellNoOfUsedTxAntenna =
+    ueCtxtDataPtr->getCellDataPtr()->getServingCellHandlerPtr()->getNoOfUsedTxAntennas(inCellIter->cgi.eNodeBCellId.cellId);
       
-       if(isExternalSCell)
-       {
-         //Fetch noOfUsedTxAntenna from shared memory from remote eNB for 
-eSCells
-         sCellNoOfUsedTxAntenna = sCellInfoPtr->getNoOfUsedTxAntennas();
-       }
-       else
-       {
-         sCellNoOfUsedTxAntenna =
-           ueCtxtDataPtr->getCellDataPtr()->getServingCellHandlerPtr()->
-getNoOfUsedTxAntennas(cellIter->cgi.eNodeBCellId.cellId);
-       }
+  if (momDataPtr->getservingEUtranGenericCell()->froType == ELIB_CONST_EUTRANCELLFDD_FRO_TYPE)
+  {
+    //FDD PCell
+    ELIB_TRACE_UE_LEVEL2(ueCtxtDataPtr->getUeTraceHandlerPtr(),
+                            ueCtxtDataPtr->getRacUeRef(),
+                            Ft_CARRIER_AGGREGATION,
+                            "checkSCellCandidate: ServingCell is FDD.");
+          
+    if(sCellInfoPtr->getCellFroRef().getFroType() == ELIB_CONST_EUTRANCELLFDD_FRO_TYPE)
+    {
+      //FDD sCell
+      ELIB_TRACE_UE_LEVEL2(ueCtxtDataPtr->getUeTraceHandlerPtr(),
+                               ueCtxtDataPtr->getRacUeRef(),
+                               Ft_CARRIER_AGGREGATION,
+                               "checkSCellCandidate: SCell is FDD.");
  
-       if (momDataPtr->getservingEUtranGenericCell()->froType == 
-ELIB_CONST_EUTRANCELLFDD_FRO_TYPE)
-       {
-         //FDD PCell
-         ELIB_TRACE_UE_LEVEL2(ueCtxtDataPtr->getUeTraceHandlerPtr(),
-                              ueCtxtDataPtr->getRacUeRef(),
-                              Ft_CARRIER_AGGREGATION,
-                              "findCandidateScell: ServingCell is FDD.");
- 
-         if(sCellInfoPtr->getCellFroRef().getFroType() == 
-ELIB_CONST_EUTRANCELLFDD_FRO_TYPE ||
-             sCellInfoPtr->getCellFroRef().getFroType() == 
-ELIB_CONST_EXTERNALEUTRANCELLFDD_FRO_TYPE)
+      // PCell is FDD, SCell is FDD.
+      if(sCellSelectionPolicyCommonPtr->initialFddPcellFddScellTxModeCalculation(sCellTxMode, sCellTxModeConfigureInMom, sCellNoOfUsedTxAntenna))
+      {
+         sCellTxModeConfigureInMom = sCellTxMode;
+         isTddSCell = false;
+      }
+      else
+      {
+         // sCellTxMode is not valid
+         return false;
+      }
+    }
+    else if(sCellInfoPtr->getCellFroRef().getFroType() == ELIB_CONST_EUTRANCELLTDD_FRO_TYPE)
+    {
+      //TDD sCell
+      ELIB_TRACE_UE_LEVEL2(ueCtxtDataPtr->getUeTraceHandlerPtr(),
+                               ueCtxtDataPtr->getRacUeRef(),
+                               Ft_CARRIER_AGGREGATION,
+                               "checkSCellCandidate: SCell is TDD. FDD TDD CA license service state %d",
+                               ueCtxtDataPtr->isLicenseOperable(ELIB_CONST_LICENSE_CARRIER_AGGREGATION_FDD_TDD_ID));
+          
+      if(ueCtxtDataPtr->isLicenseOperable(ELIB_CONST_LICENSE_CARRIER_AGGREGATION_FDD_TDD_ID) == false)
+      {
+         // FDD TDD CA license service state is not OPERABLE.
+         // NO TDD SCell when PCell is FDD
+         return false;
+      }
+      else
+      {
+         // PCell is FDD, SCell is TDD.
+        if(sCellSelectionPolicyCommonPtr->initialFddPcellTddScellTxModeCalculation(sCellTxMode, sCellTxModeConfigureInMom, sCellNoOfUsedTxAntenna))
          {
-           //FDD sCell
-           ELIB_TRACE_UE_LEVEL2(ueCtxtDataPtr->getUeTraceHandlerPtr(),
-                                ueCtxtDataPtr->getRacUeRef(),
-                                Ft_CARRIER_AGGREGATION,
-                                "findCandidateScell: SCell is FDD. 
-isExternalSCell: %d",
-                                isExternalSCell);
- 
-           // PCell is FDD, SCell is FDD.
-           if(sCellSelectionPolicyCommonPtr->
-initialFddPcellFddScellTxModeCalculation(sCellTxMode, 
-sCellTxModeConfigureInMom, sCellNoOfUsedTxAntenna))
-           {
-             sCellTxModeConfigureInMom = sCellTxMode;
-             isTddSCell = false;
-           }
-           else
-           {
-             // sCellTxMode is not valid
-             continue;
-           }
-         }
-         else if(sCellInfoPtr->getCellFroRef().getFroType() == 
-ELIB_CONST_EUTRANCELLTDD_FRO_TYPE ||
-             sCellInfoPtr->getCellFroRef().getFroType() == 
-ELIB_CONST_EXTERNALEUTRANCELLTDD_FRO_TYPE)
-         {
-           //TDD sCell
-           ELIB_TRACE_UE_LEVEL2(ueCtxtDataPtr->getUeTraceHandlerPtr(),
-                                ueCtxtDataPtr->getRacUeRef(),
-                                Ft_CARRIER_AGGREGATION,
-                                "findCandidateScell: SCell is TDD. FDD TDD CA 
-license service state %d isExternalSCell: %d",
-                                ueCtxtDataPtr->isLicenseOperable(
-ELIB_CONST_LICENSE_CARRIER_AGGREGATION_FDD_TDD_ID),
-                                isExternalSCell);
- 
-           if(ueCtxtDataPtr->isLicenseOperable(
-ELIB_CONST_LICENSE_CARRIER_AGGREGATION_FDD_TDD_ID) == false)
-           {
-             // FDD TDD CA license service state is not OPERABLE.
-             // NO TDD SCell when PCell is FDD
-             continue;
-           }
-           else
-           {
-             // PCell is FDD, SCell is TDD.
-             if(sCellSelectionPolicyCommonPtr->
-initialFddPcellTddScellTxModeCalculation(sCellTxMode, 
-sCellTxModeConfigureInMom, sCellNoOfUsedTxAntenna))
-             {
-               sCellTxModeConfigureInMom = sCellTxMode;
-               // SCell is TDD
-               isTddSCell = true;
-             }
-             else
-             {
-               // sCellTxMode is not valid
-               continue;
-             }
-           }
-         }
-       }
-       else if (momDataPtr->getservingEUtranGenericCell()->froType == 
-ELIB_CONST_EUTRANCELLTDD_FRO_TYPE)
-       {
-         // PCell is TDD, SCell is TDD
-         if(sCellSelectionPolicyCommonPtr->
-initialTddPcellTddScellTxModeCalculation(sCellTxMode, 
-sCellTxModeConfigureInMom, sCellNoOfUsedTxAntenna))
-         {
-           // valid TDD SCell Tx Mode
            sCellTxModeConfigureInMom = sCellTxMode;
+           // SCell is TDD
+           isTddSCell = true; 
          }
          else
          {
            // sCellTxMode is not valid
-           // Move to next SCell candidate.
-           continue;
+           return false;
          }
-         // SCell is TDD
-         isTddSCell = true;
-       }//wp3600 support TM3/TM8 for TDD end
+      }
+    }
+  }    
+  else if (momDataPtr->getservingEUtranGenericCell()->froType == ELIB_CONST_EUTRANCELLTDD_FRO_TYPE)
+  {
+    //CmccFastTrack WP4913 start
+    if (sCellInfoPtr->getCellFroRef().getFroType() == ELIB_CONST_EUTRANCELLTDD_FRO_TYPE)
+    {
+      // PCell is TDD, SCell is TDD
+      if(sCellSelectionPolicyCommonPtr->initialTddPcellTddScellTxModeCalculation(sCellTxMode, sCellTxModeConfigureInMom, sCellNoOfUsedTxAntenna))
+      {
+        // valid TDD SCell Tx Mode
+        sCellTxModeConfigureInMom = sCellTxMode;
+      }
+      else
+      {
+        // sCellTxMode is not valid
+        // Move to next SCell candidate.
+        return false;
+      }
  
-       U32 sCellBandwidth = sCellInfoPtr->getChannelBandwidth();
+      // SCell is TDD
+      isTddSCell = true;
+    }
+    else if (sCellInfoPtr->getCellFroRef().getFroType() == ELIB_CONST_EUTRANCELLFDD_FRO_TYPE)
+    {
+      //TDD sCell
+      ELIB_TRACE_UE_LEVEL2(ueCtxtDataPtr->getUeTraceHandlerPtr(),
+                           ueCtxtDataPtr->getRacUeRef(),
+                           Ft_CARRIER_AGGREGATION,
+                           "findCandidateScell: SCell is FDD. TDD FDD CA SC %d",
+                           ueCtxtDataPtr->getSysConstValue(SYS_CONST_CMCC_FT_FDD_TDD_CA_TDD_AS_PCELL_ENABLED_ID));
+      if(ueCtxtDataPtr->getSysConstValue(SYS_CONST_CMCC_FT_FDD_TDD_CA_TDD_AS_PCELL_ENABLED_ID) == 0)
+      {
+        // TDD FDD CA SC is 0.
+        // NO FDD SCell when PCell is TDD
+        return false;
+      }
+      else
+      {
+        // PCell is TDD, SCell is FDD.
+        if (sCellSelectionPolicyCommonPtr->initialTddPcellFddScellTxModeCalculation(sCellTxMode, sCellTxModeConfigureInMom, sCellNoOfUsedTxAntenna))
+        {
+          sCellTxModeConfigureInMom = sCellTxMode;
+        }
+        else
+        {
+          // sCellTxMode is not valid
+          // Move to next SCell candidate.
+          return false;
+        }
+      }
+     
+    }
+    //CmccFastTrack WP4913 end
+  }//wp3600 support TM3/TM8 for TDD end
  
-       if (isExternalSCell && sCellBandwidth < 10000)
-       {
-         ELIB_TRACE_UE_ABNORMAL_UID(0x199c, ueCtxtDataPtr->getCellId(), 
-ueCtxtDataPtr->getRacUeRef(),
-                                    "External sCell bandwidth %d is less than 
-10Mhz. Reject eSCell %s selection.",
-                                    sCellBandwidth, cellIter->cgi.toString().
-c_str());
-         continue;
-       }
-      
-       if (isExternalSCell && (cellIter->cellId == (U32)(-1)))
-       {
-         ELIB_TRACE_UE_ABNORMAL_UID(0x19bf, ueCtxtDataPtr->getCellId(), 
-ueCtxtDataPtr->getRacUeRef(),
-                                    "External sCell cellId %d is invalid. 
-Reject eSCell %s basic selection.",
-                                    cellIter->cellId, cellIter->cgi.toString()
-.c_str());
-         continue;
-       }
-      
-       if (sCellBandwidth < 5000)
-       {
-          ELIB_TRACE_UE_LEVEL2(ueCtxtDataPtr->getUeTraceHandlerPtr(),
-                          ueCtxtDataPtr->getRacUeRef(),
-                          uehUeBl_SCellEvalSwU,
-                          "findCandidateScell: SCell bandwidth is less than 
-5MHz. "
-                          "SCellId %d  can't be SCell candidate. bandwidth is 
-%d.",cellIter->cgi.eNodeBCellId.cellId, sCellBandwidth);
-          continue;
-       }
- 
-       RnhRadioConfEUtranGenericCellIfD* pCellEUtranGenericCellPtr = 
-ueCtxtDataPtr->getCellDataPtr()->getConfigurationDataPtr()->
-getservingEUtranGenericCell();
-       RnhNCellEUtranGenericFrequencyRangeD pCellGenericFrequencyRange(&
-pCellGenericFrequency, RnhNCellUtilD::getEutranNdlBandWidth(
-pCellEUtranGenericCellPtr));
-       RnhNCellEUtranGenericFrequencyRangeD sCellGenericFrequencyRange(
-sCellInfoPtr->getGenericFrequency(), sCellInfoPtr->getChannelBandwidth());
-       S32 bandCombinationIndex = -1;
- 
-       std::pair<U32, SupportedCarrierAggregation> sCellUeFreqBandDlUl =
-           RnhNCellFreqBandUtilD::getCarrierAggregationSCellUeFreqBand(
-eutranCapabilitiesPtr,
-                                                                       
-pCellUeEarfcn,
-                                                                       &
-pCellGenericFrequencyRange,
-                                                                       &
-sCellGenericFrequencyRange,
-                                                                       
-ueCtxtDataPtr->getSysConstValue(SYS_CONST_DISABLE_CA_BW_COMBINATION_ID),
-                                                                       
-ueCtxtDataPtr->getSysConstValue(SYS_CONST_DISABLE_CA_UL_BW_COMBINATION_ID),
-                                                                       
-isMfbiSupported,
-                                                                       &
-bandCombinationIndex,
-                                                                       
-ueCtxtDataPtr->getSysConstValue(SYS_CONST_CMCC_FT_ENABLE_MFBI_CA_ID),
-                                                                       
-isCmccFtMfbiEnhSupported);
-       U32 sCellUeFreqBand = sCellUeFreqBandDlUl.first;
- 
-       bool isUplinkSCellCandidate = false;
- 
-       if (sCellUeFreqBandDlUl.second == UL_CA_SUPPORTED)
-       {
-         isUplinkSCellCandidate = true;
-       }
- 
-       ELIB_TRACE_UE_LEVEL2(ueCtxtDataPtr->getUeTraceHandlerPtr(),
+  U32 sCellBandwidth = sCellInfoPtr->getChannelBandwidth();
+  if (sCellBandwidth < 5000)
+  {
+    ELIB_TRACE_UE_LEVEL2(ueCtxtDataPtr->getUeTraceHandlerPtr(),
                             ueCtxtDataPtr->getRacUeRef(),
                             uehUeBl_SCellEvalSwU,
-                            "findCandidateScell: isUplinkSCellCandidate = %d 
-from bandwidth check", isUplinkSCellCandidate);
+                            "checkSCellCandidate: SCell bandwidth is less than 5MHz. "
+                            "SCellId %d  can't be SCell candidate. bandwidth is %d.",inCellIter->cgi.eNodeBCellId.cellId, sCellBandwidth);
+    return false;
+  }
+  RnhRadioConfEUtranGenericCellIfD* pCellEUtranGenericCellPtr = ueCtxtDataPtr->getCellDataPtr()->getConfigurationDataPtr()->getservingEUtranGenericCell();
+  RnhNCellEUtranGenericFrequencyRangeD pCellGenericFrequencyRange(&pCellGenericFrequency, RnhNCellUtilD::getEutranNdlBandWidth(pCellEUtranGenericCellPtr));
+  RnhNCellEUtranGenericFrequencyRangeD sCellGenericFrequencyRange(sCellInfoPtr->getGenericFrequency(), sCellInfoPtr->getChannelBandwidth());
  
-       if (sCellUeFreqBand != RnhNCellFreqInfoConstantsD::
-RNH_NCELL_FREQ_INFO_CONSTANTS_BAND_UNDEFINED)
-       {
-         U32 sCellUeEarfcn = sCellGenericFrequencyRange.getGenericFrequency()
-->getEarfcn(sCellUeFreqBand);
+  U32 sCellUeFreqBand = RnhNCellFreqBandUtilD::getCarrierAggregationSCellUeFreqBand(eutranCapabilitiesPtr,
+                                                                                                 &pCellGenericFrequencyRange,
+                                                                                                 &sCellGenericFrequencyRange,
+                                                                                                 ueCtxtDataPtr->getSysConstValue(SYS_CONST_DISABLE_CA_BW_COMBINATION_ID),
+                                                                                                 ueCtxtDataPtr->getSysConstValue(SYS_CONST_CMCC_FT_ENABLE_MFBI_CA_ID),
+                                                                                                 isMfbiSupported);
  
-         //Disable lint info "Expression involving variable 'Symbol' possibly 
-depends on order of evaluation"
-         // inter band aggregation OR intra band aggregation
-         if(((sCellUeFreqBand != pCellUeFreqBand) &&
-             (eutranCapabilitiesPtr->isUlBandAggregationSupported(
-pCellUeFreqBand))) ||
-            (((sCellUeFreqBand == pCellUeFreqBand) &&
-              (pCellUeEarfcn != sCellUeEarfcn))))
-         {
-            UehCommonCtxtScellCandidateD candidateListItem;
-            candidateListItem.cellId = cellIter->cellId;
-            candidateListItem.phyCellId = sCellInfoPtr->getPci();
-            candidateListItem.nCellFreq = sCellUeEarfcn;
-            candidateListItem.nCellBandWidth = sCellBandwidth;
-            candidateListItem.sCellCgi = cellIter->cgi;
-            candidateListItem.sCellFreqId = freqIter->freqId;
-            candidateListItem.action = UEH_COMMON_SCELL_ACTION_CONFIGURING;
-            candidateListItem.configuredTxMode = sCellTxModeConfigureInMom;
-            candidateListItem.sCellIndex = 1;
-            candidateListItem.isTddSCell = isTddSCell;
-            candidateListItem.sCellOrderDirection = 
-UEH_UEBB_UEMI_SCELL_ORDER_DL;
+  if (sCellUeFreqBand != RnhNCellFreqInfoConstantsD::RNH_NCELL_FREQ_INFO_CONSTANTS_BAND_UNDEFINED)
+  {
+    U32 sCellUeEarfcn = RnhNCellFreqBandUtilD::getCarrierAggregationSCellUeEarfcn(eutranCapabilitiesPtr,
+                                                                                               &pCellGenericFrequencyRange,
+                                                                                               &sCellGenericFrequencyRange,
+                                                                                               ueCtxtDataPtr->getSysConstValue(SYS_CONST_DISABLE_CA_BW_COMBINATION_ID),
+                                                                                               ueCtxtDataPtr->getSysConstValue(SYS_CONST_CMCC_FT_ENABLE_MFBI_CA_ID),
+                                                                                               isMfbiSupported);
+    //Disable lint info "Expression involving variable 'Symbol' possibly depends on order of evaluation"
+    // inter band aggregation OR intra band aggregation
+    if(((sCellUeFreqBand != pCellUeFreqBand) &&
+         (eutranCapabilitiesPtr->isUlBandAggregationSupported(pCellUeFreqBand))) ||
+       (((sCellUeFreqBand == pCellUeFreqBand) &&
+         (pCellUeEarfcn != sCellUeEarfcn))))
+    {
+      outCandidateListItem.cellId = inCellIter->cgi.eNodeBCellId.cellId;
+      outCandidateListItem.phyCellId = sCellInfoPtr->getPci();
+      outCandidateListItem.nCellFreq = sCellUeEarfcn;
+      outCandidateListItem.nCellBandWidth = sCellBandwidth;
+      outCandidateListItem.sCellCgi = inCellIter->cgi;
+      outCandidateListItem.sCellFreqId = inFreqIter->freqId;
+      outCandidateListItem.action = UEH_COMMON_SCELL_ACTION_CONFIGURING;
+      outCandidateListItem.configuredTxMode = sCellTxModeConfigureInMom;
+      outCandidateListItem.sCellIndex = 1;
+      outCandidateListItem.isTddSCell = isTddSCell;
+      UehCommonCtxtScellCandidateVectorD candidateList;
+      candidateList.push_back(outCandidateListItem);
  
-            if (isExternalSCell)
-            {
-              candidateListItem.isExternalSCell = true;
-            }
+      ELIB_TRACE_UE_LEVEL2(
+         ueCtxtDataPtr->getUeTraceHandlerPtr(),
+         ueCtxtDataPtr->getRacUeRef(),
+         Ft_CARRIER_AGGREGATION,
+         "checkSCellCandidate found scellID %d CGI =%s freqId %d",
+         outCandidateListItem.cellId, inCellIter->cgi.toDecimal().c_str(),
+         inFreqIter->freqId);
+      // find an SCell. Exit
+      return true;
  
-            //UL CA Scell check for sCells on local eNB
-            if (!isExternalSCell && caLicenseManagerPtr->
-isUlCarrierAggregationLicenseEnabled())
-            {
-              bool isCrossDU = false;
-              if (servingCellDuId != sCellDuId)
-              {
-                isCrossDU = true;
-              }
-              bool isFddTddMix = false;
-              if (momDataPtr->getservingEUtranGenericCell()->froType != 
-sCellInfoPtr->getCellFroRef().getFroType())
-              {
-                isFddTddMix = true;
-              }
-              bool isHighSpeedUEActive = sCellInfoPtr->getHighSpeedUEActive();
+    }
+  } //   sCellUeFreqBand != RnhNCellFreqInfoConstantsD
+}  // getSCellCandidate(servingCellId) == 1
  
-              S32 noOfSectorCarriers = ueCtxtDataPtr->getCellDataPtr()->
-getServingCellHandlerPtr()->getNoOfSectorCarriers(candidateListItem.cellId);
- 
-              isUplinkSCellCandidate = isUplinkSCellCandidate &&
-                  sCellSelectionPolicyCommonPtr->isUplinkSCellCandidateValid(
-                  isCrossDU,
-                  isFddTddMix,
-                  isHighSpeedUEActive,
-                  sCellInfoPtr->getIsDlOnly(),
-                  noOfSectorCarriers,
-                  sCellCandidate,
-                  ueCtxtDataPtr->isTtiBundlingActive());
-              if(isUplinkSCellCandidate)
-              {
-                candidateListItem.sCellOrderDirection = 
-UEH_UEBB_UEMI_SCELL_ORDER_UL_AND_DL;
-             }
-            }//end of UL CA Scell check
- 
-            UehCommonCtxtScellCandidateVectorD candidateList;
-            candidateList.push_back(candidateListItem);
- 
-            //intra-cell handover to MFBI additional band
-            if (sCellSelectionPolicyCommonPtr->initiateIntraCellHoTask(
-pCellUeEarfcn, candidateList, taskInterfacePtr))
-            {
-              ELIB_TRACE_UE_LEVEL2(
-                     ueCtxtDataPtr->getUeTraceHandlerPtr(),
-                     ueCtxtDataPtr->getRacUeRef(),
-                     Ft_HO_TO_ADDITIONAL_BAND,
-                     "findCandidateScell: Intra-cell handover to 
-pCellUeFreqBand=%d, pCellUeEarfcn=%d triggered",
-                     pCellUeFreqBand, pCellUeEarfcn);
-            }
-            else
-            {
-              UehCommonCtxtScellConfigurationD sCellConfiguration = 
-ueCtxtDataPtr->getScellConfiguration();
-              sCellConfiguration.setCandidateList(candidateList);
-              ueCtxtDataPtr->setScellConfiguration(sCellConfiguration);
-            }
- 
-            ELIB_TRACE_UE_LEVEL2(
-                   ueCtxtDataPtr->getUeTraceHandlerPtr(),
-                   ueCtxtDataPtr->getRacUeRef(),
-                   Ft_CARRIER_AGGREGATION,
-                   "findCandidateScell found scellID %d CGI =%s freqId %d 
-isExternalSCell %d",
-                   candidateListItem.cellId, cellIter->cgi.toDecimal().c_str(),
-                   freqIter->freqId,
-                   isExternalSCell);
-            // find an SCell. Exit
-            return;
-         }
-       } //   sCellUeFreqBand != RnhNCellFreqInfoConstantsD
-     }  // getSCellCandidate(servingCellId) == 
-RNH_COMMON_SCELLCANDIDATE_ALLOWED OR 
-RNH_COMMON_SCELLCANDIDATE_ONLY_ALLOWED_FOR_DL
-   } //end for each cell
-  }  // end for each freq
-} //end for each earfcn
+return false;
